@@ -49,7 +49,7 @@ class TrackObject
         {
             await parser.parseAsync();
             getNewItems();
-            Thread.Sleep(1000 * 60);
+            Thread.Sleep(1000 * 6);
         }
     }
 
@@ -146,6 +146,23 @@ class AyBot
 
         Console.WriteLine($"Received a '{messageText}' message in chat {chatId}.");
 
+        if (!chats.ContainsKey(chatId))
+        {
+            chats[chatId] = new TrackChat(chatId, async (message) =>
+            {
+                try
+                {
+                    Message sentMessage = await botClient.SendTextMessageAsync(
+                        chatId: chatId,
+                        text: message);
+                }
+                catch (Exception e)
+                {
+                    Trace.WriteLine(e);
+                }
+            });
+        }
+
         if (messageText.StartsWith("track"))
         {
             string[] splitted = messageText.Split(" ");
@@ -155,22 +172,6 @@ class AyBot
                 return; // TODO: send error message
             }
 
-            if (!chats.ContainsKey(chatId))
-            {
-                chats[chatId] = new TrackChat(chatId, async (message) =>
-                {
-                    try
-                    {
-                        Message sentMessage = await botClient.SendTextMessageAsync(
-                            chatId: chatId,
-                            text: message);
-                    }
-                    catch (Exception e)
-                    {
-                        Trace.WriteLine(e);
-                    }
-                });
-            }
             chats[chatId].trackObjects.Add(new TrackObject(
                 new AyParser(splitted[2], maxPrice),
                 chats[chatId].callback));
@@ -181,6 +182,10 @@ class AyBot
         }
         else if (messageText.StartsWith("ls"))
         {
+            Message sentMessage = await botClient.SendTextMessageAsync(
+                chatId: chatId,
+                text: ls(chatId),
+                cancellationToken: cancellationToken);
 
         }
         else
@@ -191,6 +196,21 @@ class AyBot
                 cancellationToken: cancellationToken);
 
         }
+    }
+
+    private string ls(long chatId)
+    {
+        StringBuilder lsMessage = new StringBuilder();
+        TrackChat trackChat = chats[chatId];
+        List<TrackObject> trackObjects = trackChat.trackObjects;
+        foreach (TrackObject trackObject in trackObjects)
+        {
+            lsMessage.Append(trackObject.id);
+            lsMessage.Append(" ");
+            lsMessage.Append(trackObject.parser.url);
+            lsMessage.Append("\n");
+        }
+        return lsMessage.ToString();
     }
 
     private static Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
