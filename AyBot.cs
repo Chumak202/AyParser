@@ -94,9 +94,9 @@ class AyBot
     Dictionary<long, TrackChat> chats;
 
     private static readonly string helpMessage =
-        @"track price url - добавляет товар в список отслеживаемых, где 
-            price - максимальная цена товара;
-            url - ссылка для отслеживания определённой категории товаров";
+        @"1) track price url (track 35 ссылка) - добавляет товар в список отслеживаемых, где: 
+        price - максимальная цена товара;
+        url - ссылка для отслеживания определённой категории товаров;" + "\n" + "\n" + @"2) ls - выводит список всех отслеживаемых ссылок;" + "\n" + "\n" + @"3) rm id (rm 4) - удаляет отслеживаемую ссылку по id, полученному из списка ls";
 
     public AyBot(string token)
     {
@@ -165,27 +165,32 @@ class AyBot
 
         if (messageText.StartsWith("track"))
         {
-            string[] splitted = messageText.Split(" ");
-            float maxPrice = 0;
-            if (splitted.Length != 3 || !float.TryParse(splitted[1], out maxPrice))
-            {
-                return; // TODO: send error message
-            }
-
-            chats[chatId].trackObjects.Add(new TrackObject(
-                new AyParser(splitted[2], maxPrice),
-                chats[chatId].callback));
+            track(messageText, chatId);
+            Message sentMessage = await botClient.SendTextMessageAsync(
+                    chatId: chatId,
+                    text: "Ссылка добавлена для отслеживания",
+                    cancellationToken: cancellationToken);
         }
         else if (messageText.StartsWith("rm"))
         {
-
+            if (rm(messageText, chatId))
+            {
+                Message sentMessage = await botClient.SendTextMessageAsync(
+                    chatId: chatId,
+                    text: "Выбранная ссылка удалена из списка",
+                    cancellationToken: cancellationToken);
+            }
         }
         else if (messageText.StartsWith("ls"))
         {
-            Message sentMessage = await botClient.SendTextMessageAsync(
-                chatId: chatId,
-                text: ls(chatId),
-                cancellationToken: cancellationToken);
+            string msg = ls(chatId);
+            if (msg.Length > 0)
+            {
+                Message sentMessage = await botClient.SendTextMessageAsync(
+                    chatId: chatId,
+                    text: msg,
+                    cancellationToken: cancellationToken);
+            }
 
         }
         else
@@ -196,6 +201,49 @@ class AyBot
                 cancellationToken: cancellationToken);
 
         }
+    }
+
+    private void track(string messageText, long chatId)
+    {
+        string[] splitted = messageText.Split(" ");
+        float maxPrice;
+        if (splitted.Length != 3 || !float.TryParse(splitted[1], out maxPrice))
+        {
+            return; // TODO: send error message
+        }
+
+        chats[chatId].trackObjects.Add(new TrackObject(
+            new AyParser(splitted[2], maxPrice),
+            chats[chatId].callback));
+    }
+
+    private bool rm(string request, long chatId)
+    {
+        string[] splitted = request.Split(" ");
+        int deleteId;
+        if (splitted.Length != 2 || !int.TryParse(splitted[1], out deleteId))
+        {
+            return false; // TODO: send error message
+        }
+
+        TrackChat trackChat = chats[chatId];
+        List<TrackObject> trackObjects = trackChat.trackObjects;
+        TrackObject deleteObject = null;
+        foreach (TrackObject trackObject in trackObjects)
+        {
+            if (trackObject.id == deleteId)
+            {
+                deleteObject = trackObject;
+                break;
+            }
+        }
+        if (deleteObject != null)
+        {
+            deleteObject.StopTracking();
+            trackObjects.Remove(deleteObject);
+            return true;
+        }
+        return false;
     }
 
     private string ls(long chatId)
