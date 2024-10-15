@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,7 +50,7 @@ class TrackObject
         {
             await parser.parseAsync();
             getNewItems();
-            Thread.Sleep(1000 * 6);
+            Thread.Sleep(1000 * 20);
         }
     }
 
@@ -60,7 +61,7 @@ class TrackObject
         while (parser.newItems.Count > 0 && i++ < 20)
         {
             var item = parser.newItems.Dequeue();
-            sb.Append(item.ToString());
+            sb.Append(item.ToString() + '\t' +item.link);
             sb.Append('\n');
         }
         if (sb.Length > 0)
@@ -94,9 +95,8 @@ class AyBot
     Dictionary<long, TrackChat> chats;
 
     private static readonly string helpMessage =
-        @"1) track price url (track 35 ссылка) - добавляет товар в список отслеживаемых, где: 
-        price - максимальная цена товара;
-        url - ссылка для отслеживания определённой категории товаров;" + "\n" + "\n" + @"2) ls - выводит список всех отслеживаемых ссылок;" + "\n" + "\n" + @"3) rm id (rm 4) - удаляет отслеживаемую ссылку по id, полученному из списка ls";
+        @"1) Что-бы отследить товар необходимо ввести: track минимальная цена максимальная цена ссылка (пример: track 35 55 ссылка)" +
+         "\n" + "\n" + @"2) ls - выводит список всех отслеживаемых ссылок;" + "\n" + "\n" + @"3) rm id (пример: rm 4) - удаляет отслеживаемую ссылку по id, полученному из списка ls";
 
     public AyBot(string token)
     {
@@ -206,14 +206,14 @@ class AyBot
     private void track(string messageText, long chatId)
     {
         string[] splitted = messageText.Split(" ");
-        float maxPrice;
-        if (splitted.Length != 3 || !float.TryParse(splitted[1], out maxPrice))
+        float maxPrice; float minPrice;
+        if (splitted.Length != 4 || !float.TryParse(splitted[2], out maxPrice) || !float.TryParse(splitted[1], out minPrice))
         {
             return; // TODO: send error message
         }
 
         chats[chatId].trackObjects.Add(new TrackObject(
-            new AyParser(splitted[2], maxPrice),
+            new AyParser(splitted[3], maxPrice, minPrice),
             chats[chatId].callback));
     }
 

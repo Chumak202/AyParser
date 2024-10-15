@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -51,11 +52,12 @@ public class AyParser
     private List<AyItem> ayItems;
     public Uri url { get; }
     public float maxPrice { get; }
+    public float minPrice { get; }
     public Queue<AyItem> newItems { get; }
 
     private bool isFirstRun = true;
 
-    public AyParser(string url, float maxPrice)
+    public AyParser(string url, float maxPrice, float minPrice)
     {
         config = Configuration.Default;
         context = BrowsingContext.New(config);
@@ -64,6 +66,7 @@ public class AyParser
         newItems = new Queue<AyItem>();
         this.url = new Uri(url);
         this.maxPrice = maxPrice;
+        this.minPrice = minPrice;
     }
 
     public async Task parseAsync()
@@ -77,10 +80,10 @@ public class AyParser
             IDocument document = await context.OpenAsync(async req => req.Content(await source.Content.ReadAsStringAsync()));
 
             //Do something with document like the following
-            IElement listElem = document.All.Where(m => m.LocalName == "ul" &&
+            IElement? listElem = document.All.Where(m => m.LocalName == "ul" &&
             m.GetAttribute("id") == "lots-table").FirstOrDefault();
             IHtmlCollection<IElement> list = listElem.GetElementsByClassName("item-type-card__card");
-            string link, title;
+            string? link, title;
             float price;
             AyItem item;
             List<AyItem> itemList = new List<AyItem>();
@@ -88,13 +91,17 @@ public class AyParser
             {
                 link = element.GetElementsByClassName("item-type-card__link").FirstOrDefault().GetAttribute("href");
                 title = element.GetElementsByClassName("item-type-card__title").FirstOrDefault().TextContent;
-                price = Convert.ToSingle(element.GetElementsByClassName("c-hot").FirstOrDefault().GetElementsByTagName("strong").FirstOrDefault().TextContent);
+                //var a = element.GetElementsByClassName("c-hot");
+                //var c = a.FirstOrDefault();
+                //var b = c.GetElementsByTagName("strong").FirstOrDefault().TextContent;
+                //price = Convert.ToSingle(a);
+                price = Convert.ToSingle(element.GetElementsByClassName("c-hot").FirstOrDefault().GetElementsByTagName("strong").FirstOrDefault().TextContent, new CultureInfo("ru-RU", false));
                 item = new AyItem(link, title, price);
                 itemList.Add(item);
                 if (isFirstRun) {
                     continue;
                 }
-                if (!ayItems.Contains(item) && item.price <= maxPrice)
+                if (!ayItems.Contains(item) && item.price <= maxPrice && item.price >= minPrice)
                 {
                     newItems.Enqueue(item);
                 }
